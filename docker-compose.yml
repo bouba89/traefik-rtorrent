@@ -1,0 +1,66 @@
+version: '2'
+services:
+
+   traefik:
+    restart: always
+    image: traefik:v1.7.16
+    command:
+      - --logLevel=DEBUG
+      - --entrypoints=Name:http Address::80 Redirect.EntryPoint:https
+      - --entrypoints=Name:https Address::443 TLS
+      - --defaultentrypoints=http,https
+      - --acme
+      - --acme.email=admin@tchat-radio.com
+      - --acme.storage=/home/bouba89/dockers/certs/acme.json
+      - --acme.entryPoint=https
+      - --acme.httpChallenge.entryPoint=http
+      - --acme.OnHostRule=true
+      - --acme.onDemand=false
+      - --acme.acmeLogging=true
+      - --web
+      - --docker
+      - --docker.watch
+      - --docker.exposedbydefault=false
+    container_name: traefik
+    ports:
+      - 80:80
+      - 443:443
+      - 8080:8080
+    volumes:
+       - /var/run/docker.sock:/var/run/docker.sock
+       - /dev/null:/traefik.toml
+       - /home/bouba89/certs/acme.json:/acme.json
+    labels:
+      - traefik.enable=true
+      - traefik.port=8080
+      - traefik.frontend.rule=Host:traefik.tchat-radio.com
+    networks:
+            - traefik_network
+
+   rutorrent:
+    hostname: rutorrent
+    image: linuxserver/rutorrent:latest
+    networks:
+        - traefik_network
+    container_name: rutorrent
+    restart: unless-stopped
+    environment:
+      - PUID=1001
+      - PGID=1001
+    ports:
+      - 8000:80
+      - 5000:5000
+      - 51413:51413
+      - 6881:6881/udp
+    volumes:
+      - /home/bouba89/docker/rutorrent:/config
+      - /home/bouba89/seedbox:/downloads
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik_network
+      - traefik.backend=seedbox
+      - traefik.frontend.rule=Host:seedbox.tchat-radio.com
+      - traefik.port=80
+networks:
+    traefik_network:
+        external: true
